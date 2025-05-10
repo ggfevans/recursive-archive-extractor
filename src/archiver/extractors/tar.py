@@ -32,6 +32,18 @@ class TarExtractor(BaseExtractor):
             '.tar.xz', '.txz'
         )
 
+    def can_handle(self, file_path: Path) -> bool:
+        """Check if this extractor can handle the given file.
+
+        Args:
+            file_path: Path to check
+
+        Returns:
+            True if the file can be handled by this extractor
+        """
+        name = str(file_path).lower()
+        return any(name.endswith(ext) for ext in self.supported_extensions)
+
     def _is_safe_path(self, path: str, target_dir: Path) -> bool:
         """Check if the extraction path is safe (no path traversal).
 
@@ -115,11 +127,11 @@ class TarExtractor(BaseExtractor):
         Returns:
             String describing the compression type
         """
-        suffix = archive_path.suffix.lower()
-        if suffix in ('.gz', '.tgz'):
+        name = str(archive_path).lower()
+        if name.endswith(('.gz', '.tgz')):
             return 'gzip'
-        elif suffix in ('.bz2', '.tbz2'):
+        elif name.endswith(('.bz2', '.tbz2')):
             return 'bzip2'
-        elif suffix in ('.xz', '.txz'):
+        elif name.endswith(('.xz', '.txz')):
             return 'lzma'
         return 'none'

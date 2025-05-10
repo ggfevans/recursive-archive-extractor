@@ -46,7 +46,10 @@ class SevenZipExtractor(BaseExtractor):
         """
         try:
             with py7zr.SevenZipFile(archive_path, mode='r') as archive:
-                return archive.test()
+                # Test method doesn't return a value, but raises an exception if invalid
+                archive.test()
+                # If we get here, the archive is valid
+                return True
         except Exception as e:
             logger.error(f"Failed to verify 7z archive {archive_path}: {e}")
             return False
@@ -71,7 +74,7 @@ class SevenZipExtractor(BaseExtractor):
                 self.stats.failed_extractions += 1
                 return False
 
-            # Extract the archive
+            # Open and extract the archive
             with py7zr.SevenZipFile(archive_path, mode='r') as archive:
                 archive.extractall(target_dir)
                 self.stats.successful_extractions += 1
