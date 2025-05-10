@@ -32,6 +32,7 @@ from .utils.config import ArchiveConfig
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help='Path to configuration file'
 )
+# Processing options
 @click.option(
     '--parallel/--no-parallel',
     default=False,
@@ -53,6 +54,40 @@ from .utils.config import ArchiveConfig
     default=True,
     help='Verify archive integrity before extraction'
 )
+# Nested archive options
+@click.option(
+    '--process-nested/--no-process-nested',
+    default=False,
+    help='Process archives found within extracted archives'
+)
+@click.option(
+    '--max-depth',
+    type=int,
+    default=5,
+    help='Maximum depth for nested archive processing'
+)
+# Format options
+@click.option(
+    '--enable-zip/--disable-zip',
+    default=True,
+    help='Enable/disable ZIP format support'
+)
+@click.option(
+    '--enable-rar/--disable-rar',
+    default=True,
+    help='Enable/disable RAR format support'
+)
+@click.option(
+    '--enable-7z/--disable-7z',
+    default=True,
+    help='Enable/disable 7Z format support'
+)
+@click.option(
+    '--enable-tar/--disable-tar',
+    default=True,
+    help='Enable/disable TAR format support'
+)
+# Archive-specific options
 @click.option(
     '--skip-existing/--no-skip-existing',
     default=True,
@@ -72,6 +107,12 @@ def main(
     max_workers: int,
     delete_after: bool,
     verify: bool,
+    process_nested: bool,
+    max_depth: int,
+    enable_zip: bool,
+    enable_rar: bool,
+    enable_7z: bool,
+    enable_tar: bool,
     skip_existing: bool,
     password: str | None,
 ) -> None:
@@ -95,6 +136,12 @@ def main(
                 'max_workers': max_workers,
                 'delete_after_extract': delete_after,
                 'verify_integrity': verify,
+                'process_nested': process_nested,
+                'max_depth': max_depth,
+                'enable_zip': enable_zip,
+                'enable_rar': enable_rar,
+                'enable_7z': enable_7z,
+                'enable_tar': enable_tar,
                 'skip_existing': skip_existing,
                 'password': password,
             })
@@ -109,6 +156,12 @@ def main(
                 max_workers=max_workers,
                 delete_after_extract=delete_after,
                 verify_integrity=verify,
+                process_nested=process_nested,
+                max_depth=max_depth,
+                enable_zip=enable_zip,
+                enable_rar=enable_rar,
+                enable_7z=enable_7z,
+                enable_tar=enable_tar,
                 skip_existing=skip_existing,
                 password=password,
             )
@@ -132,6 +185,8 @@ def main(
         click.echo(f"Compressed files found: {stats['compressed_files_found']}")
         click.echo(f"Successful extractions: {stats['successful_extractions']}")
         click.echo(f"Failed extractions: {stats['failed_extractions']}")
+        if 'nested_archives_processed' in stats:
+            click.echo(f"Nested archives processed: {stats['nested_archives_processed']}")
 
         # Exit with error if any extractions failed
         if stats['failed_extractions'] > 0:

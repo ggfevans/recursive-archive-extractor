@@ -21,10 +21,24 @@ class ArchiveConfig:
     delete_after_extract: bool = False
     verify_integrity: bool = True
     
+    # Nested archive settings
+    process_nested: bool = False
+    max_depth: int = 5
+    verify_nested: bool = True
+    
     # Archive-specific settings
     password: Optional[str] = None
     skip_existing: bool = True
     overwrite: bool = False
+    
+    # Format settings
+    enable_zip: bool = True
+    enable_rar: bool = True
+    enable_7z: bool = True
+    enable_tar: bool = True
+    enable_tar_gz: bool = True
+    enable_tar_bz2: bool = True
+    enable_tar_xz: bool = True
     
     @classmethod
     def from_file(cls, config_file: Path) -> 'ArchiveConfig':
@@ -85,12 +99,27 @@ class ArchiveConfig:
         if self.max_workers < 1:
             raise ValueError("max_workers must be at least 1")
         
+        if self.max_depth < 1:
+            raise ValueError("max_depth must be at least 1")
+        
         if self.log_file and not isinstance(self.log_file, Path):
             raise ValueError("log_file must be a Path object")
         
         # Validate base_dir exists if not in dry run mode
         if not self.dry_run and not self.base_dir.exists():
             raise ValueError(f"base_dir does not exist: {self.base_dir}")
+        
+        # Ensure at least one format is enabled
+        if not any([
+            self.enable_zip,
+            self.enable_rar,
+            self.enable_7z,
+            self.enable_tar,
+            self.enable_tar_gz,
+            self.enable_tar_bz2,
+            self.enable_tar_xz
+        ]):
+            raise ValueError("At least one archive format must be enabled")
 
     def merge(self, other: Dict[str, Any]) -> None:
         """Merge additional configuration settings.
