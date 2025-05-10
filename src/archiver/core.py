@@ -6,6 +6,9 @@ from typing import List, Optional, Type
 from .extractors.base import BaseExtractor
 from .extractors.zip import ZipExtractor
 from .extractors.rar import RarExtractor
+from .extractors.seven_zip import SevenZipExtractor
+from .extractors.tar import TarExtractor
+from .extractors.nested import NestedArchiveHandler
 from .utils.progress import ProgressTracker
 from .utils.config import ArchiveConfig
 
@@ -30,7 +33,12 @@ class ArchiveProcessor:
         
         # Initialize extractors
         self.extractors = []
-        extractor_classes = extractors or [ZipExtractor, RarExtractor]
+        extractor_classes = extractors or [
+            ZipExtractor,
+            RarExtractor,
+            SevenZipExtractor,
+            TarExtractor
+        ]
         
         for extractor_class in extractor_classes:
             try:
@@ -39,6 +47,13 @@ class ArchiveProcessor:
                 logger.warning(
                     f"Failed to initialize {extractor_class.__name__}: {e}"
                 )
+
+        # Initialize nested archive handler
+        self.nested_handler = NestedArchiveHandler(
+            extractors=self.extractors,
+            max_depth=self.config.max_depth,
+            verify_nested=self.config.verify_integrity
+        )
 
     def _get_extractor_for_file(self, file_path: Path) -> Optional[BaseExtractor]:
         """Get appropriate extractor for the given file.
@@ -74,12 +89,23 @@ class ArchiveProcessor:
 
         success = extractor.extract(archive_path)
         
-        if success and self.config.delete_after_extract:
-            try:
-                archive_path.unlink()
-                logger.info(f"Deleted archive after extraction: {archive_path}")
-            except Exception as e:
-                logger.error(f"Failed to delete archive {archive_path}: {e}")
+        if success:
+            if self.config.process_nested:
+                # Process any nested archives
+                nested_success, nested_failed = self.nested_handler.process_nested_archives(
+                    archive_path.parent
+                )
+                logger.info(
+                    f"Processed nested archives: {nested_success} successful, "
+                    f"{nested_failed} failed"
+                )
+            
+            if self.config.delete_after_extract:
+                try:
+                    archive_path.unlink()
+                    logger.info(f"Deleted archive after extraction: {archive_path}")
+                except Exception as e:
+                    logger.error(f"Failed to delete archive {archive_path}: {e}")
 
         return success
 
@@ -96,7 +122,8 @@ class ArchiveProcessor:
             "directories_processed": 0,
             "compressed_files_found": 0,
             "successful_extractions": 0,
-            "failed_extractions": 0
+            "failed_extractions": 0,
+            "nested_archives_processed": 0
         }
 
         # Walk through directories with progress bar
@@ -145,6 +172,7 @@ class ArchiveProcessor:
         for extractor in self.extractors:
             stats = extractor.get_stats()
             for key in total_stats:
-                total_stats[key] += stats.get(key, 0)
+                if key in stats:
+                    total_stats[key] += stats[key]
 
         return total_stats
