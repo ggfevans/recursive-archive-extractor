@@ -5,6 +5,7 @@ import click
 
 from .core import ArchiveProcessor
 from .utils.logging import setup_logging
+from .utils.config import ArchiveConfig
 
 @click.command()
 @click.argument(
@@ -26,11 +27,53 @@ from .utils.logging import setup_logging
     type=click.Path(dir_okay=False, path_type=Path),
     help='Log file to write to'
 )
+@click.option(
+    '--config',
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help='Path to configuration file'
+)
+@click.option(
+    '--parallel/--no-parallel',
+    default=False,
+    help='Enable parallel processing of archives'
+)
+@click.option(
+    '--max-workers',
+    type=int,
+    default=4,
+    help='Maximum number of parallel workers'
+)
+@click.option(
+    '--delete-after/--no-delete-after',
+    default=False,
+    help='Delete archives after successful extraction'
+)
+@click.option(
+    '--verify/--no-verify',
+    default=True,
+    help='Verify archive integrity before extraction'
+)
+@click.option(
+    '--skip-existing/--no-skip-existing',
+    default=True,
+    help='Skip extraction if files already exist'
+)
+@click.option(
+    '--password',
+    help='Password for encrypted archives'
+)
 def main(
     directory: Path,
     verbose: bool,
     dry_run: bool,
-    log_file: Path | None
+    log_file: Path | None,
+    config: Path | None,
+    parallel: bool,
+    max_workers: int,
+    delete_after: bool,
+    verify: bool,
+    skip_existing: bool,
+    password: str | None,
 ) -> None:
     """
     Recursively extract archives in the specified directory.
@@ -38,19 +81,49 @@ def main(
     DIRECTORY: The target directory to process
     """
     try:
+        # Initialize configuration
+        if config:
+            # Load from config file
+            config_obj = ArchiveConfig.from_file(config)
+            # Override with command line arguments
+            config_obj.merge({
+                'base_dir': directory,
+                'verbose': verbose,
+                'dry_run': dry_run,
+                'log_file': log_file,
+                'parallel_processing': parallel,
+                'max_workers': max_workers,
+                'delete_after_extract': delete_after,
+                'verify_integrity': verify,
+                'skip_existing': skip_existing,
+                'password': password,
+            })
+        else:
+            # Create config from command line arguments
+            config_obj = ArchiveConfig(
+                base_dir=directory,
+                dry_run=dry_run,
+                verbose=verbose,
+                log_file=log_file,
+                parallel_processing=parallel,
+                max_workers=max_workers,
+                delete_after_extract=delete_after,
+                verify_integrity=verify,
+                skip_existing=skip_existing,
+                password=password,
+            )
+
+        # Validate configuration
+        config_obj.validate()
+
         # Set up logging
         setup_logging(
-            log_file=log_file,
-            verbose=verbose
+            log_file=config_obj.log_file,
+            verbose=config_obj.verbose
         )
 
         # Create and run processor
-        processor = ArchiveProcessor(
-            base_dir=directory,
-            dry_run=dry_run
-        )
-
-        # Process archives and get statistics
+        processor = ArchiveProcessor(config=config_obj)
         stats = processor.process_directory()
 
         # Print summary
